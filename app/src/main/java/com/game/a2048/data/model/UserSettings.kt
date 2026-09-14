@@ -6,5 +6,9 @@ import kotlinx.serialization.Serializable
 data class UserSettings(
     val soundEnabled: Boolean = true,
     val hapticsEnabled: Boolean = true,
-    val themeMode: String = "DEFAULT" // Using String for DataStore compatibility if needed, or enum.
+    val themeMode: String = "DEFAULT",
+    val isAdFree: Boolean = false,
+    val hammerUses: Int = 2,
+    val switchUses: Int = 2,
+    val undoUses: Int = 2
 )

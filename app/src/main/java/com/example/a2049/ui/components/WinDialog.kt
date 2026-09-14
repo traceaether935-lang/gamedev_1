@@ -35,7 +35,8 @@ fun WinDialog(
     onNewGame: () -> Unit,
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
-    winMessage: String? = null
+    winMessage: String? = null,
+    onHome: (() -> Unit)? = null
 ) {
     val message = winMessage ?: "Congratulations! You created the $targetGoal tile!\nScore: $score"
 
@@ -88,14 +89,14 @@ fun WinDialog(
                         )
                     }
 
-                    // Action Buttons (Keep Playing, New Game)
-                    Row(
+                    // Action Buttons (Keep Playing, New Game, Home)
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Button(
                             onClick = onKeepPlaying,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Text(
@@ -104,12 +105,27 @@ fun WinDialog(
                             )
                         }
 
-                        OutlinedButton(
-                            onClick = onNewGame,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("New Game")
+                            OutlinedButton(
+                                onClick = onNewGame,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("New Game")
+                            }
+
+                            if (onHome != null) {
+                                OutlinedButton(
+                                    onClick = onHome,
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text("Home")
+                                }
+                            }
                         }
                     }
                 }

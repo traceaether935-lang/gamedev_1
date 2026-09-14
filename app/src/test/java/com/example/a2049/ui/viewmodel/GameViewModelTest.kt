@@ -380,5 +380,52 @@ class GameViewModelTest {
         Assert.assertTrue(rewardedAdTriggered)
         assertEquals(2, viewModel.hammerUses.value)
     }
+
+    @Test
+    fun setAdFreeUpdatesStateAndPersists() = runTest {
+        val viewModel = GameViewModel(
+            rows = 4,
+            cols = 4,
+            targetGoal = 2048,
+            initialMissionId = null,
+            gameRepository = gameRepository,
+            statisticsRepository = statisticsRepository,
+            settingsRepository = settingsRepository
+        )
+
+        Assert.assertFalse(viewModel.isAdFree.value)
+
+        viewModel.setAdFree(true)
+
+        Assert.assertTrue(viewModel.isAdFree.value)
+        val settings = settingsRepository.userSettingsFlow.first()
+        Assert.assertTrue(settings.isAdFree)
+    }
+
+    @Test
+    fun consumablePacksGrant5UsesEach() = runTest {
+        val viewModel = GameViewModel(
+            rows = 4,
+            cols = 4,
+            targetGoal = 2048,
+            initialMissionId = null,
+            gameRepository = gameRepository,
+            statisticsRepository = statisticsRepository,
+            settingsRepository = settingsRepository
+        )
+
+        val initialHammer = viewModel.hammerUses.value
+        val initialSwitch = viewModel.switchUses.value
+        val initialUndo = viewModel.undoUses.value
+
+        viewModel.onConsumablePurchased("sku_buy_hammer_pack")
+        assertEquals(initialHammer + 5, viewModel.hammerUses.value)
+
+        viewModel.onConsumablePurchased("sku_buy_switch_pack")
+        assertEquals(initialSwitch + 5, viewModel.switchUses.value)
+
+        viewModel.onConsumablePurchased("sku_buy_undo_pack")
+        assertEquals(initialUndo + 5, viewModel.undoUses.value)
+    }
 }
 

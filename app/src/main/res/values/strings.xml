@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">2049</string>
+    <string name="game_services_project_id">123456789012</string>
 </resources>

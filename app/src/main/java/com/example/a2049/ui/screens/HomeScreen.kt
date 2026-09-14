@@ -20,6 +20,7 @@ import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Grid4x4
 import androidx.compose.material.icons.rounded.Hexagon
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material.icons.rounded.ViewColumn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -30,8 +31,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.a2049.auth.PlayGamesAuthManager
 import com.example.a2049.ui.components.ClassicSetupDialog
 import com.example.a2049.ui.components.HexSetupDialog
 import com.example.a2049.ui.components.MediumRectangleAd
@@ -51,15 +55,20 @@ import com.example.a2049.ui.theme._2049Theme
 
 @Composable
 fun HomeScreen(
+    playGamesAuthManager: PlayGamesAuthManager? = null,
     onPlayClicked: (rows: Int, cols: Int, targetGoal: Int, missionId: Int?) -> Unit,
     onHexagonModeClicked: (radius: Int) -> Unit,
     onColumnDropClicked: () -> Unit,
     onSettingsClicked: () -> Unit,
     onStatisticsClicked: () -> Unit,
     modifier: Modifier = Modifier,
+    onStoreClicked: (() -> Unit)? = null,
 ) {
     var showClassicSetupDialog by remember { mutableStateOf(false) }
     var showHexSetupDialog by remember { mutableStateOf(false) }
+
+    val isAuthenticated by (playGamesAuthManager?.isAuthenticated?.collectAsState() ?: remember { mutableStateOf(false) })
+    val playerName by (playGamesAuthManager?.playerName?.collectAsState() ?: remember { mutableStateOf(null) })
 
     if (showClassicSetupDialog) {
         ClassicSetupDialog(
@@ -96,17 +105,64 @@ fun HomeScreen(
             // Header bar
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onSettingsClicked,
-                    modifier = Modifier.size(48.dp)
+                Surface(
+                    onClick = {
+                        if (!isAuthenticated) {
+                            playGamesAuthManager?.signIn()
+                        } else {
+                            playGamesAuthManager?.checkAuthentication()
+                        }
+                    },
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (isAuthenticated) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                    tonalElevation = 2.dp
                 ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Settings,
-                        contentDescription = "Settings",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = if (isAuthenticated) {
+                                if (!playerName.isNullOrBlank()) "🎮 $playerName" else "🎮 Play Games: Connected"
+                            } else {
+                                "🎮 Play Games: Offline"
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isAuthenticated) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (onStoreClicked != null) {
+                        IconButton(
+                            onClick = onStoreClicked,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.ShoppingBag,
+                                contentDescription = "Store",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = onSettingsClicked,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Settings,
+                            contentDescription = "Settings",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
 

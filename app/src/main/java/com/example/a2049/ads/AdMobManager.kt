@@ -2,6 +2,11 @@ package com.example.a2049.ads
 
 import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.MutableContextWrapper
+import android.os.Handler
+import android.os.Looper
+import android.view.ContextThemeWrapper
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
@@ -18,6 +23,8 @@ object AdMobManager {
     const val BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/6300978111"
     const val MEDIUM_RECTANGLE_AD_UNIT_ID = "ca-app-pub-3940256099942544/6300978111"
 
+    var isAdFree: Boolean = false
+
     private var rewardedAd: RewardedAd? = null
     private var interstitialAd: InterstitialAd? = null
 
@@ -25,7 +32,22 @@ object AdMobManager {
     private var isInterstitialLoading = false
 
     var restartCount: Int = 0
+    var homeNavCount: Int = 0
     var lastHomeAdTime: Long = 0L
+
+    private fun runOnMainThread(action: () -> Unit) {
+        try {
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                action()
+            } else {
+                Handler(Looper.getMainLooper()).post(action)
+            }
+        } catch (_: Exception) {
+            try {
+                action()
+            } catch (_: Exception) {}
+        }
+    }
 
     fun loadRewardedAd(context: Context, onLoaded: (() -> Unit)? = null) {
         if (rewardedAd != null || isRewardedLoading) {
@@ -74,7 +96,6 @@ object AdMobManager {
                 onRewardEarned()
             })
         } else {
-            // If rewarded ad wasn't preloaded, attempt load or invoke reward directly for smooth experience
             loadRewardedAd(activity) {
                 val reloaded = rewardedAd
                 if (reloaded != null) {
@@ -88,7 +109,24 @@ object AdMobManager {
         }
     }
 
+    private fun Context?.findActivity(): Activity? {
+        if (this == null) return null
+        var currentContext: Context? = this
+        val visited = mutableSetOf<Context>()
+        while (currentContext != null && visited.add(currentContext)) {
+            if (currentContext is Activity) return currentContext
+            currentContext = when (currentContext) {
+                is ContextThemeWrapper -> currentContext.baseContext
+                is MutableContextWrapper -> currentContext.baseContext
+                is ContextWrapper -> currentContext.baseContext
+                else -> null
+            }
+        }
+        return null
+    }
+
     fun loadInterstitialAd(context: Context, onLoaded: (() -> Unit)? = null) {
+        if (isAdFree) return
         if (interstitialAd != null || isInterstitialLoading) {
             if (interstitialAd != null) {
                 onLoaded?.invoke()
@@ -116,45 +154,88 @@ object AdMobManager {
         )
     }
 
-    fun showInterstitialAd(activity: Activity, onAdDismissed: (() -> Unit)? = null) {
+    fun showInterstitial(
+        context: Context?,
+        onAdDismissed: (() -> Unit)? = null
+    ) {
+        if (isAdFree) {
+            runOnMainThread { onAdDismissed?.invoke() }
+            return
+        }
+        val activity = context.findActivity()
+        if (activity == null) {
+            runOnMainThread { onAdDismissed?.invoke() }
+            return
+        }
         val ad = interstitialAd
         if (ad != null) {
             ad.fullScreenContentCallback = object : FullScreenContentCallback() {
                 override fun onAdDismissedFullScreenContent() {
                     interstitialAd = null
                     loadInterstitialAd(activity)
-                    onAdDismissed?.invoke()
+                    runOnMainThread { onAdDismissed?.invoke() }
                 }
 
                 override fun onAdFailedToShowFullScreenContent(error: AdError) {
                     interstitialAd = null
                     loadInterstitialAd(activity)
-                    onAdDismissed?.invoke()
+                    runOnMainThread { onAdDismissed?.invoke() }
                 }
             }
-            ad.show(activity)
+            try {
+                ad.show(activity)
+            } catch (_: Exception) {
+                interstitialAd = null
+                loadInterstitialAd(activity)
+                runOnMainThread { onAdDismissed?.invoke() }
+            }
         } else {
-            loadInterstitialAd(activity)
-            onAdDismissed?.invoke()
+            if (context != null) {
+                loadInterstitialAd(context)
+            }
+            runOnMainThread { onAdDismissed?.invoke() }
         }
     }
 
-    fun onGameRestart(activity: Activity, onAdDismissed: (() -> Unit)? = null) {
+    fun showInterstitialAd(
+        activity: Activity,
+        isAdFreeCheck: Boolean = isAdFree,
+        onAdDismissed: (() -> Unit)? = null
+    ) {
+        if (isAdFreeCheck) {
+            runOnMainThread { onAdDismissed?.invoke() }
+            return
+        }
+        showInterstitial(activity, onAdDismissed)
+    }
+
+    fun onGameRestart(context: Context, onAdDismissed: (() -> Unit)? = null) {
+        if (isAdFree) {
+            runOnMainThread { onAdDismissed?.invoke() }
+            return
+        }
         restartCount++
         if (restartCount % 2 == 0) {
-            showInterstitialAd(activity, onAdDismissed)
+            showInterstitial(context, onAdDismissed)
         } else {
-            onAdDismissed?.invoke()
+            runOnMainThread { onAdDismissed?.invoke() }
         }
     }
 
-    fun onHomeNavigation(activity: Activity, onAdDismissed: (() -> Unit)? = null) {
-        val now = System.currentTimeMillis()
-        if (now - lastHomeAdTime >= 7 * 60 * 1000L) {
-            lastHomeAdTime = now
-            showInterstitialAd(activity, onAdDismissed)
-        } else {
-            onAdDismissed?.invoke()
+    fun onHomeNavigation(context: Context?, onAdDismissed: (() -> Unit)? = null) {
+        if (isAdFree) {
+            runOnMainThread { onAdDismissed?.invoke() }
+            return
         }
+        homeNavCount++
+        if (homeNavCount % 4 == 0) {
+            showInterstitial(context, onAdDismissed)
+        } else {
+            runOnMainThread { onAdDismissed?.invoke() }
+        }
+    }
+
+    fun onBackNavigation(context: Context?, onAdDismissed: (() -> Unit)? = null) {
+        onHomeNavigation(context, onAdDismissed)
     }
 }

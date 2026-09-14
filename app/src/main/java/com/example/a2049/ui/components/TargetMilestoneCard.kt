@@ -71,8 +71,8 @@ fun TargetMilestoneCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -86,7 +86,7 @@ fun TargetMilestoneCard(
                     contentColor = tileColors.text
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
@@ -94,11 +94,11 @@ fun TargetMilestoneCard(
                             imageVector = Icons.Rounded.EmojiEvents,
                             contentDescription = null,
                             tint = tileColors.text,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                         Text(
                             text = "Target: $targetTile",
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = tileColors.text
                         )
@@ -118,7 +118,7 @@ fun TargetMilestoneCard(
                     )
                     Text(
                         text = "$highestTile / $targetTile",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -130,7 +130,7 @@ fun TargetMilestoneCard(
                 progress = { animatedProgress },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(8.dp)
+                    .height(6.dp)
                     .clip(CircleShape),
                 color = tileColors.background,
                 trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),

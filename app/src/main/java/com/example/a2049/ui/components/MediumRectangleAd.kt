@@ -29,8 +29,11 @@ import com.google.android.gms.ads.AdView
 @Composable
 fun MediumRectangleAd(
     modifier: Modifier = Modifier,
-    adUnitId: String = AdMobManager.MEDIUM_RECTANGLE_AD_UNIT_ID
+    adUnitId: String = AdMobManager.MEDIUM_RECTANGLE_AD_UNIT_ID,
+    isAdFree: Boolean = AdMobManager.isAdFree
 ) {
+    if (isAdFree) return
+
     val isPreview = LocalInspectionMode.current
 
     Surface(

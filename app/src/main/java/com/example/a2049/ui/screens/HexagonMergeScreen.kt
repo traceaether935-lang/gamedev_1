@@ -3,6 +3,8 @@ package com.example.a2049.ui.screens
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.MutableContextWrapper
+import android.view.ContextThemeWrapper
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,10 +70,16 @@ import com.game.a2048.hex.HexCell
 import com.game.a2048.hex.HexGrid
 
 private fun Context.findActivity(): Activity? {
-    var ctx = this
-    while (ctx is ContextWrapper) {
-        if (ctx is Activity) return ctx
-        ctx = ctx.baseContext
+    var currentContext: Context? = this
+    val visited = mutableSetOf<Context>()
+    while (currentContext != null && visited.add(currentContext)) {
+        if (currentContext is Activity) return currentContext
+        currentContext = when (currentContext) {
+            is ContextThemeWrapper -> currentContext.baseContext
+            is MutableContextWrapper -> currentContext.baseContext
+            is ContextWrapper -> currentContext.baseContext
+            else -> null
+        }
     }
     return null
 }
@@ -119,21 +127,13 @@ fun HexagonMergeScreen(
 
     fun handleNavigateHome() {
         viewModel.leaveGame()
-        if (activity != null) {
-            AdMobManager.onHomeNavigation(activity) {
-                onNavigateBack()
-            }
-        } else {
+        AdMobManager.onHomeNavigation(context) {
             onNavigateBack()
         }
     }
 
     fun handleRestart() {
-        if (activity != null) {
-            AdMobManager.onGameRestart(activity) {
-                viewModel.restart()
-            }
-        } else {
+        AdMobManager.onGameRestart(context) {
             viewModel.restart()
         }
     }
@@ -168,7 +168,12 @@ fun HexagonMergeScreen(
                 },
                 navigationIcon = {
                     IconButton(
-                        onClick = { handleNavigateHome() },
+                        onClick = {
+                            viewModel.leaveGame()
+                            AdMobManager.onBackNavigation(context) {
+                                onNavigateBack()
+                            }
+                        },
                         modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
@@ -423,6 +428,7 @@ fun HexagonMergeScreen(
                 winMessage = "Congratulations! You reached the 2048 Hex Tile!\nScore: ${uiState.gameState.currentScore}",
                 onKeepPlaying = { viewModel.continueGame() },
                 onNewGame = { handleRestart() },
+                onHome = { handleNavigateHome() },
                 onDismissRequest = { viewModel.dismissWinDialog() }
             )
         }

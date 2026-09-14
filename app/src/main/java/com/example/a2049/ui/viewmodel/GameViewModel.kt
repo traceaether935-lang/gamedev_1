@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.a2049.auth.PlayGamesAuthManager
+import com.example.a2049.billing.BillingManager
 import com.example.a2049.ui.model.ActiveTool
 import com.example.a2049.ui.model.FeedbackEvent
 import com.example.a2049.ui.model.FeedbackWords
@@ -43,7 +45,9 @@ class GameViewModel(
     val initialMissionId: Int? = null,
     private val gameRepository: GameRepository,
     private val statisticsRepository: StatisticsRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    playGamesAuthManager: PlayGamesAuthManager? = null,
+    private val billingManager: BillingManager? = null
 ) : ViewModel() {
 
     // Helper to keep old scores for N x N boards, while supporting R x C sizes
@@ -70,6 +74,9 @@ class GameViewModel(
     private val _feedbackEvent = MutableStateFlow<FeedbackEvent?>(null)
     val feedbackEvent: StateFlow<FeedbackEvent?> = _feedbackEvent.asStateFlow()
 
+    private val _isAdFree = MutableStateFlow(false)
+    val isAdFree: StateFlow<Boolean> = _isAdFree.asStateFlow()
+
     private val _undoUses = MutableStateFlow(2)
     val undoUses: StateFlow<Int> = _undoUses.asStateFlow()
 
@@ -89,10 +96,24 @@ class GameViewModel(
     private var swapFirstTile: Pair<Int, Int>? = null
 
     init {
+        playGamesAuthManager?.let { auth ->
+            viewModelScope.launch {
+                auth.isAuthenticated.collect { isAuthenticated ->
+                    if (isAuthenticated) {
+                        billingManager?.restorePurchases()
+                    }
+                }
+            }
+        }
+
         viewModelScope.launch {
             launch {
                 settingsRepository.userSettingsFlow.collect { settings ->
                     _uiState.update { it.copy(userSettings = settings) }
+                    _isAdFree.value = settings.isAdFree
+                    _hammerUses.value = settings.hammerUses
+                    _switchUses.value = settings.switchUses
+                    _undoUses.value = settings.undoUses
                 }
             }
 
@@ -161,16 +182,40 @@ class GameViewModel(
         }
     }
 
+    fun setAdFree(adFree: Boolean) {
+        _isAdFree.value = adFree
+        viewModelScope.launch {
+            settingsRepository.setAdFree(adFree)
+        }
+    }
+
+    fun onConsumablePurchased(productId: String) {
+        when (productId) {
+            "sku_buy_hammer_pack" -> addHammerUses(5)
+            "sku_buy_switch_pack" -> addSwitchUses(5)
+            "sku_buy_undo_pack" -> addUndoUses(5)
+        }
+    }
+
     fun addUndoUses(count: Int = 2) {
         _undoUses.update { it + count }
+        viewModelScope.launch {
+            settingsRepository.setUndoUses(_undoUses.value)
+        }
     }
 
     fun addHammerUses(count: Int = 2) {
         _hammerUses.update { it + count }
+        viewModelScope.launch {
+            settingsRepository.setHammerUses(_hammerUses.value)
+        }
     }
 
     fun addSwitchUses(count: Int = 2) {
         _switchUses.update { it + count }
+        viewModelScope.launch {
+            settingsRepository.setSwitchUses(_switchUses.value)
+        }
     }
 
     fun onUndoToolClicked(onRequestRewardedAd: ((onRewardEarned: () -> Unit) -> Unit)? = null) {
@@ -178,6 +223,9 @@ class GameViewModel(
             val success = gameEngine.undo()
             if (success) {
                 _undoUses.update { it - 1 }
+                viewModelScope.launch {
+                    settingsRepository.setUndoUses(_undoUses.value)
+                }
                 _activeTool.value = ActiveTool.NONE
                 _firstSelectedTileIndex.value = null
                 persistCurrentGameState()
@@ -322,6 +370,9 @@ class GameViewModel(
                     val success = gameEngine.useHammer(row, col)
                     if (success) {
                         _hammerUses.update { it - 1 }
+                        viewModelScope.launch {
+                            settingsRepository.setHammerUses(_hammerUses.value)
+                        }
                         _activeTool.value = ActiveTool.NONE
                         _firstSelectedTileIndex.value = null
                         persistCurrentGameState()
@@ -353,6 +404,9 @@ class GameViewModel(
                         val success = gameEngine.useSwap(first.first, first.second, row, col)
                         if (success) {
                             _switchUses.update { it - 1 }
+                            viewModelScope.launch {
+                                settingsRepository.setSwitchUses(_switchUses.value)
+                            }
                             _activeTool.value = ActiveTool.NONE
                             _firstSelectedTileIndex.value = null
                             persistCurrentGameState()
@@ -597,7 +651,9 @@ class GameViewModelFactory(
     private val rows: Int,
     private val cols: Int,
     private val targetGoal: Int = 32,
-    private val initialMissionId: Int? = null
+    private val initialMissionId: Int? = null,
+    private val playGamesAuthManager: PlayGamesAuthManager? = null,
+    private val billingManager: BillingManager? = null
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -608,7 +664,9 @@ class GameViewModelFactory(
             initialMissionId = initialMissionId,
             gameRepository = GameRepository(context),
             statisticsRepository = StatisticsRepository(context),
-            settingsRepository = SettingsRepository(context)
+            settingsRepository = SettingsRepository(context),
+            playGamesAuthManager = playGamesAuthManager,
+            billingManager = billingManager
         ) as T
     }
 }

@@ -14,8 +14,11 @@ import com.google.android.gms.ads.AdView
 @Composable
 fun BannerAd(
     modifier: Modifier = Modifier,
-    adUnitId: String = AdMobManager.BANNER_AD_UNIT_ID
+    adUnitId: String = AdMobManager.BANNER_AD_UNIT_ID,
+    isAdFree: Boolean = AdMobManager.isAdFree
 ) {
+    if (isAdFree) return
+
     Box(
         modifier = modifier.fillMaxWidth(),
         contentAlignment = Alignment.Center
