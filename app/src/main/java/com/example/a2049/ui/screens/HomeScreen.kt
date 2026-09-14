@@ -199,18 +199,18 @@ fun HomeScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "2048 Puzzle",
-                            fontSize = 44.sp,
+                            text = "Number Drop",
+                            fontSize = 36.sp,
                             fontWeight = FontWeight.Black,
                             color = Color.White,
                             letterSpacing = 1.sp
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Join the numbers & master all modes!",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.9f)
+                            text = "2048 Hexa Merge",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White.copy(alpha = 0.95f)
                         )
                     }
                 }
