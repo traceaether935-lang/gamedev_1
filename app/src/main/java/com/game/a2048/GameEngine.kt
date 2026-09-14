@@ -250,9 +250,7 @@ class GameEngine(
         if (r1 !in 0 until state.rows || c1 !in 0 until state.cols) return false
         if (r2 !in 0 until state.rows || c2 !in 0 until state.cols) return false
 
-        val dr = abs(r1 - r2)
-        val dc = abs(c1 - c2)
-        if ((dr == 1 && dc == 0) || (dr == 0 && dc == 1)) {
+        if (r1 != r2 || c1 != c2) {
             previousState = state.copy(canUndo = false)
 
             val v1 = state.grid[r1][c1]

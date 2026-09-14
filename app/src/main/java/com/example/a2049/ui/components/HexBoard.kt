@@ -65,9 +65,16 @@ fun findPlacementCellsForBoard(
 
 fun findCellAtOffset(offset: Offset, width: Float, height: Float, radius: Int = HexGrid.DEFAULT_RADIUS): HexCell? {
     val maxRowSpan = 2 * radius + 1
+    val maxRowWidthFactor = maxRowSpan * sqrt(3.0f)
+    val maxRowHeightFactor = 3 * radius + 2.0f
+    val verticalPaddingPx = min(width, height) * 0.06f
+
+    val availableWidth = (width - verticalPaddingPx * 2).coerceAtLeast(1f)
+    val availableHeight = (height - verticalPaddingPx * 2).coerceAtLeast(1f)
+
     val hexRadiusPx = min(
-        width / (maxRowSpan * sqrt(3.0f)),
-        height / (maxRowSpan * 1.5f)
+        availableWidth / maxRowWidthFactor,
+        availableHeight / maxRowHeightFactor
     )
     val centerX = width / 2f
     val centerY = height / 2f
@@ -141,9 +148,16 @@ fun HexBoard(
             val height = size.height
 
             val maxRowSpan = 2 * radius + 1
+            val maxRowWidthFactor = maxRowSpan * sqrt(3.0f)
+            val maxRowHeightFactor = 3 * radius + 2.0f
+            val verticalPaddingPx = min(width, height) * 0.06f
+
+            val availableWidth = (width - verticalPaddingPx * 2).coerceAtLeast(1f)
+            val availableHeight = (height - verticalPaddingPx * 2).coerceAtLeast(1f)
+
             val hexRadiusPx = min(
-                width / (maxRowSpan * sqrt(3.0f)),
-                height / (maxRowSpan * 1.5f)
+                availableWidth / maxRowWidthFactor,
+                availableHeight / maxRowHeightFactor
             )
             val tileR = hexRadiusPx * 0.90f
 

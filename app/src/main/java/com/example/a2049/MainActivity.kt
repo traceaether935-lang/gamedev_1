@@ -11,15 +11,21 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import com.example.a2049.ads.AdMobManager
 import com.example.a2049.ui.navigation.AppNavigation
 import com.example.a2049.ui.theme._2049Theme
 import com.example.a2049.ui.theme.AppThemeMode
 import com.game.a2048.data.SettingsRepository
+import com.google.android.gms.ads.MobileAds
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        MobileAds.initialize(this)
+        AdMobManager.loadRewardedAd(this)
+        AdMobManager.loadInterstitialAd(this)
         
         val settingsRepository = SettingsRepository(this)
         

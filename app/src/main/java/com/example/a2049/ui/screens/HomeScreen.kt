@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.a2049.ui.components.ClassicSetupDialog
 import com.example.a2049.ui.components.HexSetupDialog
+import com.example.a2049.ui.components.MediumRectangleAd
 import com.example.a2049.ui.theme._2049Theme
 
 @Composable
@@ -59,8 +60,6 @@ fun HomeScreen(
 ) {
     var showClassicSetupDialog by remember { mutableStateOf(false) }
     var showHexSetupDialog by remember { mutableStateOf(false) }
-
-    val scrollState = rememberScrollState()
 
     if (showClassicSetupDialog) {
         ClassicSetupDialog(
@@ -89,7 +88,7 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(scrollState)
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -268,6 +267,10 @@ fun HomeScreen(
                     fontWeight = FontWeight.Bold
                 )
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            MediumRectangleAd()
         }
     }
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.a2049.ui.model.ActiveTool
 import com.example.a2049.ui.model.FeedbackEvent
 import com.example.a2049.ui.model.FeedbackWords
 import com.game.a2048.Direction
@@ -69,6 +70,21 @@ class GameViewModel(
     private val _feedbackEvent = MutableStateFlow<FeedbackEvent?>(null)
     val feedbackEvent: StateFlow<FeedbackEvent?> = _feedbackEvent.asStateFlow()
 
+    private val _undoUses = MutableStateFlow(2)
+    val undoUses: StateFlow<Int> = _undoUses.asStateFlow()
+
+    private val _hammerUses = MutableStateFlow(2)
+    val hammerUses: StateFlow<Int> = _hammerUses.asStateFlow()
+
+    private val _switchUses = MutableStateFlow(2)
+    val switchUses: StateFlow<Int> = _switchUses.asStateFlow()
+
+    private val _activeTool = MutableStateFlow(ActiveTool.NONE)
+    val activeTool: StateFlow<ActiveTool> = _activeTool.asStateFlow()
+
+    private val _firstSelectedTileIndex = MutableStateFlow<Pair<Int, Int>?>(null)
+    val firstSelectedTileIndex: StateFlow<Pair<Int, Int>?> = _firstSelectedTileIndex.asStateFlow()
+
     private var eventIdCounter: Long = 0L
     private var swapFirstTile: Pair<Int, Int>? = null
 
@@ -87,45 +103,129 @@ class GameViewModel(
                 }
             }
 
-            val savedState = gameRepository.getSavedGameStateFlow(boardId).firstOrNull()
+            val isMissionMode = initialMissionId != null || initialMission != null
 
-            if (savedState != null && savedState.gridValues.size == rows * cols) {
-                val grid = savedState.gridValues.chunked(cols)
-                val status = try {
-                    GameStatus.valueOf(savedState.status)
-                } catch (_: Exception) {
-                    GameStatus.PLAYING
-                }
-                gameEngine.setGrid(
-                    grid = grid,
-                    score = savedState.currentScore,
-                    moveCount = savedState.moveCount,
-                    status = status,
-                    isContinued = savedState.isContinued,
-                    targetGoal = savedState.targetGoal,
-                    activeMission = initialMission ?: gameEngine.state.activeMission
+            if (isMissionMode) {
+                gameEngine.restart(
+                    rows = rows,
+                    cols = cols,
+                    targetGoal = initialMission?.targetValue ?: targetGoal,
+                    activeMission = initialMission
                 )
-                val isWinDialog = (status == GameStatus.WON && !savedState.isContinued)
-                val isPauseDialog = (status == GameStatus.PAUSED)
                 _uiState.update {
                     it.copy(
-                        isWinDialogShown = isWinDialog,
-                        isPauseDialogShown = isPauseDialog,
+                        gameState = gameEngine.state,
+                        isWinDialogShown = false,
+                        isPauseDialogShown = false,
                         isMissionCompleteDialogShown = gameEngine.state.isMissionCompleted,
                         isMissionFailedDialogShown = gameEngine.state.isMissionFailed
                     )
                 }
             } else {
-                statisticsRepository.recordGameStarted(boardId)
-                persistCurrentGameState()
+                val savedState = gameRepository.getSavedGameStateFlow(boardId).firstOrNull()
+
+                if (savedState != null && savedState.gridValues.size == rows * cols) {
+                    val grid = savedState.gridValues.chunked(cols)
+                    val status = try {
+                        GameStatus.valueOf(savedState.status)
+                    } catch (_: Exception) {
+                        GameStatus.PLAYING
+                    }
+                    gameEngine.setGrid(
+                        grid = grid,
+                        score = savedState.currentScore,
+                        moveCount = savedState.moveCount,
+                        status = status,
+                        isContinued = savedState.isContinued,
+                        targetGoal = savedState.targetGoal,
+                        activeMission = null
+                    )
+                    val isWinDialog = (status == GameStatus.WON && !savedState.isContinued)
+                    val isPauseDialog = (status == GameStatus.PAUSED)
+                    _uiState.update {
+                        it.copy(
+                            gameState = gameEngine.state,
+                            isWinDialogShown = isWinDialog,
+                            isPauseDialogShown = isPauseDialog,
+                            isMissionCompleteDialogShown = false,
+                            isMissionFailedDialogShown = false
+                        )
+                    }
+                } else {
+                    statisticsRepository.recordGameStarted(boardId)
+                    persistCurrentGameState()
+                }
             }
 
             updateUiState(isLoading = false)
         }
     }
 
+    fun addUndoUses(count: Int = 2) {
+        _undoUses.update { it + count }
+    }
+
+    fun addHammerUses(count: Int = 2) {
+        _hammerUses.update { it + count }
+    }
+
+    fun addSwitchUses(count: Int = 2) {
+        _switchUses.update { it + count }
+    }
+
+    fun onUndoToolClicked(onRequestRewardedAd: ((onRewardEarned: () -> Unit) -> Unit)? = null) {
+        if (_undoUses.value > 0) {
+            val success = gameEngine.undo()
+            if (success) {
+                _undoUses.update { it - 1 }
+                _activeTool.value = ActiveTool.NONE
+                _firstSelectedTileIndex.value = null
+                persistCurrentGameState()
+                updateUiState()
+            }
+        } else {
+            if (onRequestRewardedAd != null) {
+                onRequestRewardedAd { addUndoUses(2) }
+            } else {
+                addUndoUses(2)
+            }
+        }
+    }
+
+    fun onHammerToolClicked(onRequestRewardedAd: ((onRewardEarned: () -> Unit) -> Unit)? = null) {
+        if (_hammerUses.value > 0) {
+            _activeTool.update { current ->
+                if (current == ActiveTool.HAMMER) ActiveTool.NONE else ActiveTool.HAMMER
+            }
+            _firstSelectedTileIndex.value = null
+        } else {
+            if (onRequestRewardedAd != null) {
+                onRequestRewardedAd { addHammerUses(2) }
+            } else {
+                addHammerUses(2)
+            }
+        }
+    }
+
+    fun onSwitchToolClicked(onRequestRewardedAd: ((onRewardEarned: () -> Unit) -> Unit)? = null) {
+        if (_switchUses.value > 0) {
+            _activeTool.update { current ->
+                if (current == ActiveTool.SWITCH) ActiveTool.NONE else ActiveTool.SWITCH
+            }
+            _firstSelectedTileIndex.value = null
+        } else {
+            if (onRequestRewardedAd != null) {
+                onRequestRewardedAd { addSwitchUses(2) }
+            } else {
+                addSwitchUses(2)
+            }
+        }
+    }
+
     fun selectMission(mission: Mission?) {
         swapFirstTile = null
+        _activeTool.value = ActiveTool.NONE
+        _firstSelectedTileIndex.value = null
         gameEngine.selectMission(mission)
         _uiState.update {
             it.copy(
@@ -141,8 +241,12 @@ class GameViewModel(
 
     fun retryMission() {
         swapFirstTile = null
+        _activeTool.value = ActiveTool.NONE
+        _firstSelectedTileIndex.value = null
         viewModelScope.launch {
-            gameRepository.clearSavedGameState(boardId)
+            if (gameEngine.state.activeMission == null) {
+                gameRepository.clearSavedGameState(boardId)
+            }
             statisticsRepository.recordGameStarted(boardId)
             gameEngine.restart(rows, cols, gameEngine.state.targetGoal, gameEngine.state.activeMission)
             _uiState.update {
@@ -199,27 +303,90 @@ class GameViewModel(
     }
 
     fun onTileClick(row: Int, col: Int) {
-        val activePowerUp = gameEngine.state.activePowerUp
-        if (activePowerUp == PowerUpType.HAMMER) {
-            val success = gameEngine.useHammer(row, col)
-            if (success) {
-                persistCurrentGameState()
-                updateUiState()
-            } else {
-                togglePowerUp(PowerUpType.HAMMER)
+        when (_activeTool.value) {
+            ActiveTool.HAMMER -> {
+                if (_hammerUses.value > 0 && gameEngine.state.grid.getOrNull(row)?.getOrNull(col) != 0) {
+                    if (gameEngine.state.hammerCount <= 0) {
+                        gameEngine.setGrid(
+                            grid = gameEngine.state.grid,
+                            score = gameEngine.state.currentScore,
+                            moveCount = gameEngine.state.moveCount,
+                            status = gameEngine.state.status,
+                            canUndo = gameEngine.state.canUndo,
+                            isContinued = gameEngine.state.isContinued,
+                            targetGoal = gameEngine.state.targetGoal,
+                            hammerCount = _hammerUses.value,
+                            swapCount = _switchUses.value
+                        )
+                    }
+                    val success = gameEngine.useHammer(row, col)
+                    if (success) {
+                        _hammerUses.update { it - 1 }
+                        _activeTool.value = ActiveTool.NONE
+                        _firstSelectedTileIndex.value = null
+                        persistCurrentGameState()
+                        updateUiState()
+                    }
+                }
             }
-        } else if (activePowerUp == PowerUpType.SWAP) {
-            if (swapFirstTile == null) {
-                swapFirstTile = Pair(row, col)
-            } else {
-                val (r1, c1) = swapFirstTile!!
-                val success = gameEngine.useSwap(r1, c1, row, col)
-                swapFirstTile = null
-                if (success) {
-                    persistCurrentGameState()
-                    updateUiState()
-                } else {
-                    togglePowerUp(PowerUpType.SWAP)
+            ActiveTool.SWITCH -> {
+                if (_switchUses.value > 0) {
+                    val first = _firstSelectedTileIndex.value
+                    if (first == null) {
+                        _firstSelectedTileIndex.value = Pair(row, col)
+                    } else if (first.first == row && first.second == col) {
+                        _firstSelectedTileIndex.value = null
+                    } else {
+                        if (gameEngine.state.swapCount <= 0) {
+                            gameEngine.setGrid(
+                                grid = gameEngine.state.grid,
+                                score = gameEngine.state.currentScore,
+                                moveCount = gameEngine.state.moveCount,
+                                status = gameEngine.state.status,
+                                canUndo = gameEngine.state.canUndo,
+                                isContinued = gameEngine.state.isContinued,
+                                targetGoal = gameEngine.state.targetGoal,
+                                hammerCount = _hammerUses.value,
+                                swapCount = _switchUses.value
+                            )
+                        }
+                        val success = gameEngine.useSwap(first.first, first.second, row, col)
+                        if (success) {
+                            _switchUses.update { it - 1 }
+                            _activeTool.value = ActiveTool.NONE
+                            _firstSelectedTileIndex.value = null
+                            persistCurrentGameState()
+                            updateUiState()
+                        } else {
+                            _firstSelectedTileIndex.value = null
+                        }
+                    }
+                }
+            }
+            ActiveTool.NONE -> {
+                val activePowerUp = gameEngine.state.activePowerUp
+                if (activePowerUp == PowerUpType.HAMMER) {
+                    val success = gameEngine.useHammer(row, col)
+                    if (success) {
+                        persistCurrentGameState()
+                        updateUiState()
+                    } else {
+                        togglePowerUp(PowerUpType.HAMMER)
+                    }
+                } else if (activePowerUp == PowerUpType.SWAP) {
+                    if (swapFirstTile == null) {
+                        swapFirstTile = Pair(row, col)
+                    } else {
+                        val (r1, c1) = swapFirstTile!!
+                        val success = gameEngine.useSwap(r1, c1, row, col)
+                        swapFirstTile = null
+                        if (success) {
+                            persistCurrentGameState()
+                            updateUiState()
+                        } else {
+                            togglePowerUp(PowerUpType.SWAP)
+                        }
+                    }
                 }
             }
         }
@@ -233,7 +400,8 @@ class GameViewModel(
         val currentState = _uiState.value
         if (currentState.isPauseDialogShown || currentState.isWinDialogShown ||
             currentState.isMissionCompleteDialogShown || currentState.isMissionFailedDialogShown ||
-            gameEngine.state.status != GameStatus.PLAYING || gameEngine.state.activePowerUp != null
+            gameEngine.state.status != GameStatus.PLAYING || gameEngine.state.activePowerUp != null ||
+            _activeTool.value != ActiveTool.NONE
         ) {
             return
         }
@@ -299,7 +467,9 @@ class GameViewModel(
                         highestTile = highestTile,
                         moveCount = newState.moveCount
                     )
-                    gameRepository.clearSavedGameState(boardId)
+                    if (newState.activeMission == null) {
+                        gameRepository.clearSavedGameState(boardId)
+                    }
                 }
                 _uiState.update {
                     it.copy(
@@ -322,26 +492,26 @@ class GameViewModel(
     }
 
     fun undo() {
-        swapFirstTile = null
-        if (gameEngine.undo()) {
-            persistCurrentGameState()
-            updateUiState()
-        }
+        onUndoToolClicked(null)
     }
 
     fun restart() {
         swapFirstTile = null
+        _activeTool.value = ActiveTool.NONE
+        _firstSelectedTileIndex.value = null
         viewModelScope.launch {
-            gameRepository.clearSavedGameState(boardId)
+            if (gameEngine.state.activeMission == null) {
+                gameRepository.clearSavedGameState(boardId)
+            }
             statisticsRepository.recordGameStarted(boardId)
-            gameEngine.restart(rows, cols, gameEngine.state.targetGoal)
+            gameEngine.restart(rows, cols, gameEngine.state.targetGoal, gameEngine.state.activeMission)
             _uiState.update {
                 it.copy(
                     gameState = gameEngine.state,
                     isWinDialogShown = false,
                     isPauseDialogShown = false,
-                    isMissionCompleteDialogShown = gameEngine.state.isMissionCompleted,
-                    isMissionFailedDialogShown = gameEngine.state.isMissionFailed
+                    isMissionCompleteDialogShown = false,
+                    isMissionFailedDialogShown = false
                 )
             }
             persistCurrentGameState()
@@ -404,6 +574,9 @@ class GameViewModel(
 
     private fun persistCurrentGameState() {
         val currentState = gameEngine.state
+        if (currentState.activeMission != null) {
+            return
+        }
         val savedState = SavedGameState(
             boardSize = boardId,
             gridValues = currentState.grid.flatten(),

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.a2049.ui.model.ActiveTool
 import com.example.a2049.ui.model.FeedbackEvent
 import com.example.a2049.ui.model.FeedbackWords
 import com.game.a2048.GameStatus
@@ -68,6 +69,21 @@ class HexagonMergeViewModel(
     private val _swapFirstCell = MutableStateFlow<HexCell?>(null)
     val swapFirstCell: StateFlow<HexCell?> = _swapFirstCell.asStateFlow()
 
+    private val _undoUses = MutableStateFlow(2)
+    val undoUses: StateFlow<Int> = _undoUses.asStateFlow()
+
+    private val _hammerUses = MutableStateFlow(2)
+    val hammerUses: StateFlow<Int> = _hammerUses.asStateFlow()
+
+    private val _switchUses = MutableStateFlow(2)
+    val switchUses: StateFlow<Int> = _switchUses.asStateFlow()
+
+    private val _activeTool = MutableStateFlow(ActiveTool.NONE)
+    val activeTool: StateFlow<ActiveTool> = _activeTool.asStateFlow()
+
+    private val _firstSelectedCell = MutableStateFlow<HexCell?>(null)
+    val firstSelectedCell: StateFlow<HexCell?> = _firstSelectedCell.asStateFlow()
+
     private var eventIdCounter: Long = 0L
 
     init {
@@ -119,14 +135,81 @@ class HexagonMergeViewModel(
         }
     }
 
+    fun addUndoUses(count: Int = 2) {
+        _undoUses.update { it + count }
+    }
+
+    fun addHammerUses(count: Int = 2) {
+        _hammerUses.update { it + count }
+    }
+
+    fun addSwitchUses(count: Int = 2) {
+        _switchUses.update { it + count }
+    }
+
+    fun onUndoToolClicked(onRequestRewardedAd: ((onRewardEarned: () -> Unit) -> Unit)? = null) {
+        if (_undoUses.value > 0) {
+            _swapFirstCell.value = null
+            _firstSelectedCell.value = null
+            if (hexEngine.undo()) {
+                _undoUses.update { it - 1 }
+                _activeTool.value = ActiveTool.NONE
+                persistCurrentGameState()
+                updateUiState()
+            }
+        } else {
+            if (onRequestRewardedAd != null) {
+                onRequestRewardedAd { addUndoUses(2) }
+            } else {
+                addUndoUses(2)
+            }
+        }
+    }
+
+    fun onHammerToolClicked(onRequestRewardedAd: ((onRewardEarned: () -> Unit) -> Unit)? = null) {
+        if (_hammerUses.value > 0) {
+            _swapFirstCell.value = null
+            _firstSelectedCell.value = null
+            _activeTool.update { current ->
+                if (current == ActiveTool.HAMMER) ActiveTool.NONE else ActiveTool.HAMMER
+            }
+        } else {
+            if (onRequestRewardedAd != null) {
+                onRequestRewardedAd { addHammerUses(2) }
+            } else {
+                addHammerUses(2)
+            }
+        }
+    }
+
+    fun onSwitchToolClicked(onRequestRewardedAd: ((onRewardEarned: () -> Unit) -> Unit)? = null) {
+        if (_switchUses.value > 0) {
+            _swapFirstCell.value = null
+            _firstSelectedCell.value = null
+            _activeTool.update { current ->
+                if (current == ActiveTool.SWITCH) ActiveTool.NONE else ActiveTool.SWITCH
+            }
+        } else {
+            if (onRequestRewardedAd != null) {
+                onRequestRewardedAd { addSwitchUses(2) }
+            } else {
+                addSwitchUses(2)
+            }
+        }
+    }
+
     fun togglePowerUp(powerUp: PowerUpType) {
         _swapFirstCell.value = null
+        _activeTool.value = ActiveTool.NONE
+        _firstSelectedCell.value = null
         hexEngine.togglePowerUp(powerUp)
         updateUiState()
     }
 
     fun cancelPowerUp() {
         _swapFirstCell.value = null
+        _activeTool.value = ActiveTool.NONE
+        _firstSelectedCell.value = null
         hexEngine.cancelPowerUp()
         updateUiState()
     }
@@ -154,6 +237,10 @@ class HexagonMergeViewModel(
         val oldTargetGoal = hexEngine.state.targetGoal
         val success = hexEngine.useHammer(cell)
         if (success) {
+            if (_activeTool.value == ActiveTool.HAMMER) {
+                if (_hammerUses.value > 0) _hammerUses.update { it - 1 }
+                _activeTool.value = ActiveTool.NONE
+            }
             if (currentState.userSettings.hapticsEnabled) {
                 onHaptic?.invoke()
             }
@@ -198,6 +285,11 @@ class HexagonMergeViewModel(
         val success = hexEngine.useSwap(cell1, cell2)
         if (success) {
             _swapFirstCell.value = null
+            _firstSelectedCell.value = null
+            if (_activeTool.value == ActiveTool.SWITCH) {
+                if (_switchUses.value > 0) _switchUses.update { it - 1 }
+                _activeTool.value = ActiveTool.NONE
+            }
             if (currentState.userSettings.hapticsEnabled) {
                 onHaptic?.invoke()
             }
@@ -337,7 +429,7 @@ class HexagonMergeViewModel(
                 onSound?.invoke(result.scoreGained > 0)
             }
 
-            val newTargetGoal = hexEngine.state.targetGoal
+            val newTargetGoal = result.newState.targetGoal
             if (newTargetGoal > oldTargetGoal) {
                 _feedbackEvent.value = FeedbackEvent(
                     id = System.currentTimeMillis() * 1000 + (++eventIdCounter),
@@ -386,16 +478,14 @@ class HexagonMergeViewModel(
     }
 
     fun undo() {
-        _swapFirstCell.value = null
-        if (hexEngine.undo()) {
-            persistCurrentGameState()
-            updateUiState()
-        }
+        onUndoToolClicked(null)
     }
 
     fun restart() {
         viewModelScope.launch {
             _swapFirstCell.value = null
+            _firstSelectedCell.value = null
+            _activeTool.value = ActiveTool.NONE
             gameRepository.clearSavedGameState(boardId)
             statisticsRepository.recordGameStarted(boardId)
             hexEngine.restart()

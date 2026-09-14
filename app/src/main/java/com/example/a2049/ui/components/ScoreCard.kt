@@ -6,7 +6,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -34,20 +37,24 @@ fun ScoreCard(
         modifier = modifier.semantics {
             contentDescription = "$title score is $score"
         },
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(38.dp)
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = title.uppercase(),
-                style = MaterialTheme.typography.labelMedium.copy(
+                style = MaterialTheme.typography.labelSmall.copy(
                     letterSpacing = 1.sp,
                     fontWeight = FontWeight.Bold
                 ),
@@ -67,8 +74,8 @@ fun ScoreCard(
             ) { targetScore ->
                 Text(
                     text = targetScore.toString(),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.ExtraBold,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }

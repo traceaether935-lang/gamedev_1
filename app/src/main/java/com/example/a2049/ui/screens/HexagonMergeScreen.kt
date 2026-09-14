@@ -1,31 +1,30 @@
 package com.example.a2049.ui.screens
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.Undo
-import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -47,12 +46,19 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.a2049.ads.AdMobManager
+import com.example.a2049.ui.components.BannerAd
 import com.example.a2049.ui.components.FloatingFeedbackText
+import com.example.a2049.ui.components.GameOverDialog
+import com.example.a2049.ui.components.GameToolbar
 import com.example.a2049.ui.components.HexBoard
+import com.example.a2049.ui.components.PauseDialog
 import com.example.a2049.ui.components.ScoreCard
 import com.example.a2049.ui.components.TargetMilestoneCard
 import com.example.a2049.ui.components.UpcomingPiecesTray
+import com.example.a2049.ui.components.WinDialog
 import com.example.a2049.ui.components.findCellAtOffset
+import com.example.a2049.ui.model.ActiveTool
 import com.example.a2049.ui.theme.AppThemeMode
 import com.example.a2049.ui.viewmodel.HexagonMergeViewModel
 import com.example.a2049.ui.viewmodel.HexagonMergeViewModelFactory
@@ -60,7 +66,15 @@ import com.example.a2049.util.SoundManager
 import com.game.a2048.GameStatus
 import com.game.a2048.hex.HexCell
 import com.game.a2048.hex.HexGrid
-import com.game.a2048.hex.PowerUpType
+
+private fun Context.findActivity(): Activity? {
+    var ctx = this
+    while (ctx is ContextWrapper) {
+        if (ctx is Activity) return ctx
+        ctx = ctx.baseContext
+    }
+    return null
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,6 +85,7 @@ fun HexagonMergeScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
     val viewModel: HexagonMergeViewModel = viewModel(
         key = "hex_$gridRadius",
         factory = HexagonMergeViewModelFactory(context, gridRadius)
@@ -80,6 +95,11 @@ fun HexagonMergeScreen(
     val feedbackEvent by viewModel.feedbackEvent.collectAsState()
     val upcomingPieces by viewModel.upcomingPieces.collectAsState()
     val swapFirstCell by viewModel.swapFirstCell.collectAsState()
+    val undoUses by viewModel.undoUses.collectAsState()
+    val hammerUses by viewModel.hammerUses.collectAsState()
+    val switchUses by viewModel.switchUses.collectAsState()
+    val activeTool by viewModel.activeTool.collectAsState()
+
     val hapticFeedback = LocalHapticFeedback.current
     val soundManager = remember { SoundManager() }
 
@@ -97,14 +117,34 @@ fun HexagonMergeScreen(
         }
     }
 
+    fun handleNavigateHome() {
+        viewModel.leaveGame()
+        if (activity != null) {
+            AdMobManager.onHomeNavigation(activity) {
+                onNavigateBack()
+            }
+        } else {
+            onNavigateBack()
+        }
+    }
+
+    fun handleRestart() {
+        if (activity != null) {
+            AdMobManager.onGameRestart(activity) {
+                viewModel.restart()
+            }
+        } else {
+            viewModel.restart()
+        }
+    }
+
     BackHandler {
         if (!uiState.isPauseDialogShown && !uiState.isWinDialogShown &&
             uiState.gameState.status == GameStatus.PLAYING
         ) {
             viewModel.pause()
         } else {
-            viewModel.leaveGame()
-            onNavigateBack()
+            handleNavigateHome()
         }
     }
 
@@ -128,10 +168,7 @@ fun HexagonMergeScreen(
                 },
                 navigationIcon = {
                     IconButton(
-                        onClick = {
-                            viewModel.leaveGame()
-                            onNavigateBack()
-                        },
+                        onClick = { handleNavigateHome() },
                         modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
@@ -141,6 +178,25 @@ fun HexagonMergeScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { viewModel.pause() },
+                        enabled = isInteractive,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Pause,
+                            contentDescription = "Pause"
+                        )
+                    }
+                    IconButton(
+                        onClick = { handleRestart() },
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Refresh,
+                            contentDescription = "Restart"
+                        )
+                    }
                     IconButton(
                         onClick = onNavigateToSettings,
                         modifier = Modifier.size(48.dp)
@@ -158,13 +214,13 @@ fun HexagonMergeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(16.dp),
+                .padding(horizontal = 12.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 ScoreCard(
                     title = "SCORE",
@@ -178,68 +234,15 @@ fun HexagonMergeScreen(
                 )
             }
 
-            // Power-up Action Controls
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val hammerActive = uiState.gameState.activePowerUp == PowerUpType.HAMMER
-                FilledTonalIconButton(
-                    onClick = {
-                        selectedPieceIndex = null
-                        viewModel.togglePowerUp(PowerUpType.HAMMER)
-                    },
-                    enabled = isInteractive && uiState.gameState.hammerCount > 0,
-                    modifier = Modifier.size(56.dp),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = if (hammerActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer
-                    )
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Rounded.Build,
-                            contentDescription = "Hammer",
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Text(text = "${uiState.gameState.hammerCount}", style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-
-                val swapActive = uiState.gameState.activePowerUp == PowerUpType.SWAP
-                FilledTonalIconButton(
-                    onClick = {
-                        selectedPieceIndex = null
-                        viewModel.togglePowerUp(PowerUpType.SWAP)
-                    },
-                    enabled = isInteractive && uiState.gameState.swapCount > 0,
-                    modifier = Modifier.size(56.dp),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = if (swapActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer
-                    )
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Rounded.SwapHoriz,
-                            contentDescription = "Swap",
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Text(text = "${uiState.gameState.swapCount}", style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-            }
-
             // Target Milestone Card directly above hex board
             TargetMilestoneCard(
                 targetTile = uiState.gameState.targetGoal,
                 highestTile = uiState.gameState.grid.values.maxOrNull() ?: 0,
                 themeMode = uiState.userSettings.themeMode,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
+                modifier = Modifier.fillMaxWidth()
             )
+
+            Spacer(modifier = Modifier.height(4.dp))
 
             val currentThemeMode = try {
                 AppThemeMode.valueOf(uiState.userSettings.themeMode)
@@ -250,8 +253,7 @@ fun HexagonMergeScreen(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
+                    .fillMaxWidth(),
                 contentAlignment = Alignment.Center
             ) {
                 HexBoard(
@@ -261,7 +263,7 @@ fun HexagonMergeScreen(
                     activePieceSize = activePieceSize,
                     radius = uiState.gameState.radius,
                     selectedSwapCell = swapFirstCell,
-                    activePowerUp = uiState.gameState.activePowerUp,
+                    activePowerUp = null,
                     onBoardPositioned = { pos, w, h ->
                         boardRootOffset = pos
                         boardWidth = w
@@ -269,8 +271,8 @@ fun HexagonMergeScreen(
                     },
                     onCellClick = { cell ->
                         if (!isInteractive) return@HexBoard
-                        when (uiState.gameState.activePowerUp) {
-                            PowerUpType.HAMMER -> {
+                        when (activeTool) {
+                            ActiveTool.HAMMER -> {
                                 if ((uiState.gameState.grid[cell] ?: 0) != 0) {
                                     viewModel.useHammer(
                                         cell = cell,
@@ -281,7 +283,7 @@ fun HexagonMergeScreen(
                                     )
                                 }
                             }
-                            PowerUpType.SWAP -> {
+                            ActiveTool.SWITCH -> {
                                 val first = swapFirstCell
                                 if (first == null) {
                                     if ((uiState.gameState.grid[cell] ?: 0) != 0) {
@@ -300,7 +302,7 @@ fun HexagonMergeScreen(
                                     )
                                 }
                             }
-                            null -> {
+                            ActiveTool.NONE -> {
                                 val pieceIdx = selectedPieceIndex
                                 if (pieceIdx != null) {
                                     viewModel.placePiece(
@@ -330,7 +332,7 @@ fun HexagonMergeScreen(
                 )
             }
 
-            // Upcoming Pieces Tray at bottom
+            // Upcoming Pieces Tray
             UpcomingPiecesTray(
                 upcomingPieces = upcomingPieces,
                 selectedPieceIndex = selectedPieceIndex,
@@ -367,141 +369,80 @@ fun HexagonMergeScreen(
                     hoveredCell = null
                 },
                 themeMode = currentThemeMode,
-                modifier = Modifier.padding(bottom = 8.dp)
+                modifier = Modifier
             )
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                FilledTonalIconButton(
-                    onClick = { viewModel.undo() },
-                    enabled = uiState.gameState.canUndo && isInteractive,
-                    modifier = Modifier.size(52.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.Undo,
-                        contentDescription = "Undo",
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
+            // GameToolbar
+            GameToolbar(
+                undoUses = undoUses,
+                hammerUses = hammerUses,
+                switchUses = switchUses,
+                activeTool = activeTool,
+                onUndoClick = {
+                    viewModel.onUndoToolClicked { onRewardEarned ->
+                        if (activity != null) {
+                            AdMobManager.showRewardedAd(activity, onRewardEarned)
+                        } else {
+                            onRewardEarned()
+                        }
+                    }
+                },
+                onHammerClick = {
+                    selectedPieceIndex = null
+                    viewModel.onHammerToolClicked { onRewardEarned ->
+                        if (activity != null) {
+                            AdMobManager.showRewardedAd(activity, onRewardEarned)
+                        } else {
+                            onRewardEarned()
+                        }
+                    }
+                },
+                onSwitchClick = {
+                    selectedPieceIndex = null
+                    viewModel.onSwitchToolClicked { onRewardEarned ->
+                        if (activity != null) {
+                            AdMobManager.showRewardedAd(activity, onRewardEarned)
+                        } else {
+                            onRewardEarned()
+                        }
+                    }
+                },
+                isEnabled = isInteractive,
+                modifier = Modifier.fillMaxWidth()
+            )
 
-                FilledTonalIconButton(
-                    onClick = { viewModel.pause() },
-                    enabled = isInteractive,
-                    modifier = Modifier.size(52.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Pause,
-                        contentDescription = "Pause",
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
-
-                FilledTonalIconButton(
-                    onClick = { viewModel.restart() },
-                    modifier = Modifier.size(52.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Refresh,
-                        contentDescription = "Restart",
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
-            }
+            BannerAd(
+                modifier = Modifier.fillMaxWidth()
+            )
         }
 
         if (uiState.isWinDialogShown) {
-            AlertDialog(
-                onDismissRequest = { viewModel.dismissWinDialog() },
-                title = { Text(text = "You Win! 🎉", fontWeight = FontWeight.Bold) },
-                text = {
-                    Text(text = "Congratulations! You reached the 2048 Hex Tile!\nScore: ${uiState.gameState.currentScore}")
-                },
-                confirmButton = {
-                    Button(
-                        onClick = { viewModel.continueGame() },
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Keep Playing")
-                    }
-                },
-                dismissButton = {
-                    OutlinedButton(
-                        onClick = { viewModel.restart() },
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("New Game")
-                    }
-                }
+            WinDialog(
+                targetGoal = 2048,
+                score = uiState.gameState.currentScore,
+                winMessage = "Congratulations! You reached the 2048 Hex Tile!\nScore: ${uiState.gameState.currentScore}",
+                onKeepPlaying = { viewModel.continueGame() },
+                onNewGame = { handleRestart() },
+                onDismissRequest = { viewModel.dismissWinDialog() }
             )
         }
 
         if (uiState.gameState.status == GameStatus.GAME_OVER) {
-            AlertDialog(
-                onDismissRequest = {},
-                title = { Text(text = "Game Over! 😔", fontWeight = FontWeight.Bold) },
-                text = {
-                    Text(
-                        text = "No available hex merges left.\n\nFinal Score: ${uiState.gameState.currentScore}\nBest Score: ${uiState.gameState.bestScore}"
-                    )
-                },
-                confirmButton = {
-                    Button(
-                        onClick = { viewModel.restart() },
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Try Again")
-                    }
-                },
-                dismissButton = {
-                    OutlinedButton(
-                        onClick = {
-                            viewModel.leaveGame()
-                            onNavigateBack()
-                        },
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Home")
-                    }
-                }
+            GameOverDialog(
+                score = uiState.gameState.currentScore,
+                bestScore = uiState.gameState.bestScore,
+                message = "No available hex merges left.",
+                onRestart = { handleRestart() },
+                onHome = { handleNavigateHome() }
             )
         }
 
         if (uiState.isPauseDialogShown) {
-            AlertDialog(
-                onDismissRequest = { viewModel.resume() },
-                title = { Text(text = "Game Paused ⏸️", fontWeight = FontWeight.Bold) },
-                text = { Text(text = "Hexagon Merge Mode\nGame is currently paused.") },
-                confirmButton = {
-                    Button(
-                        onClick = { viewModel.resume() },
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Resume")
-                    }
-                },
-                dismissButton = {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = { viewModel.restart() },
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Text("Restart")
-                        }
-                        TextButton(
-                            onClick = {
-                                viewModel.leaveGame()
-                                onNavigateBack()
-                            }
-                        ) {
-                            Text("Home")
-                        }
-                    }
-                }
+            PauseDialog(
+                subtitle = "Hexagon Merge Mode\nGame is currently paused.",
+                onResume = { viewModel.resume() },
+                onRestart = { handleRestart() },
+                onHome = { handleNavigateHome() }
             )
         }
     }
