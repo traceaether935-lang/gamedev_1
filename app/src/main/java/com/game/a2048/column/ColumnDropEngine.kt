@@ -1,7 +1,7 @@
 package com.game.a2048.column
 
 import com.game.a2048.GameStatus
-import com.example.a2049.ui.model.ActiveTool
+import com.aethertrace.numberdrop2048hexa.ui.model.ActiveTool
 import kotlin.random.Random
 
 class ColumnDropEngine(

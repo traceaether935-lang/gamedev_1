@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.a2049"
+    namespace = "com.aethertrace.numberdrop2048hexa"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.a2049"
+        applicationId = "com.aethertrace.numberdrop2048hexa"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
