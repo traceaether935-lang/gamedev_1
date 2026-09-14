@@ -25,7 +25,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -56,11 +57,19 @@ fun StatisticsScreen(
         factory = StatisticsViewModelFactory(context)
     )
 
-    val selectedBoardSize by viewModel.selectedBoardSize.collectAsState()
-    val stats4x4 by viewModel.stats4x4.collectAsState()
-    val stats5x5 by viewModel.stats5x5.collectAsState()
+    val selectedMainTab by viewModel.selectedMainTab.collectAsState()
+    val selectedClassicGrid by viewModel.selectedClassicGrid.collectAsState()
 
-    val currentStats = if (selectedBoardSize == 5) stats5x5 else stats4x4
+    val statsHexagon by viewModel.statsHexagon.collectAsState()
+    val statsColumnDrop by viewModel.statsColumnDrop.collectAsState()
+    val classicStats by viewModel.getStatsForGrid(selectedClassicGrid).collectAsState()
+
+    val currentStats = when (selectedMainTab) {
+        0 -> classicStats
+        1 -> statsHexagon
+        2 -> statsColumnDrop
+        else -> classicStats
+    }
 
     val winRate = if (currentStats.gamesPlayed > 0) {
         (currentStats.gamesWon * 100) / currentStats.gamesPlayed
@@ -97,20 +106,42 @@ fun StatisticsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            PrimaryTabRow(
-                selectedTabIndex = if (selectedBoardSize == 5) 1 else 0,
+            TabRow(
+                selectedTabIndex = selectedMainTab,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Tab(
-                    selected = selectedBoardSize == 4,
-                    onClick = { viewModel.selectBoardSize(4) },
-                    text = { Text("4 × 4 Grid", fontWeight = FontWeight.Bold) }
+                    selected = selectedMainTab == 0,
+                    onClick = { viewModel.selectMainTab(0) },
+                    text = { Text("Classic", fontWeight = FontWeight.Bold) }
                 )
                 Tab(
-                    selected = selectedBoardSize == 5,
-                    onClick = { viewModel.selectBoardSize(5) },
-                    text = { Text("5 × 5 Grid", fontWeight = FontWeight.Bold) }
+                    selected = selectedMainTab == 1,
+                    onClick = { viewModel.selectMainTab(1) },
+                    text = { Text("Hexagon Merge", fontWeight = FontWeight.Bold) }
                 )
+                Tab(
+                    selected = selectedMainTab == 2,
+                    onClick = { viewModel.selectMainTab(2) },
+                    text = { Text("Column Drop", fontWeight = FontWeight.Bold) }
+                )
+            }
+
+            if (selectedMainTab == 0) {
+                val classicSizes = listOf(4, 5, 6, 7, 8, 9)
+                ScrollableTabRow(
+                    selectedTabIndex = classicSizes.indexOf(selectedClassicGrid).coerceAtLeast(0),
+                    modifier = Modifier.fillMaxWidth(),
+                    edgePadding = 0.dp
+                ) {
+                    classicSizes.forEach { size ->
+                        Tab(
+                            selected = selectedClassicGrid == size,
+                            onClick = { viewModel.selectClassicGrid(size) },
+                            text = { Text("$size × $size Grid", fontWeight = FontWeight.SemiBold) }
+                        )
+                    }
+                }
             }
 
             LazyVerticalGrid(

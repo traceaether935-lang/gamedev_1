@@ -17,7 +17,7 @@ import kotlin.math.abs
 
 fun Modifier.swipeDetector(
     enabled: Boolean = true,
-    minSwipeDistanceDp: Dp = 30.dp,
+    minSwipeDistanceDp: Dp = 24.dp,
     onSwipe: (Direction) -> Unit
 ): Modifier = composed {
     if (!enabled) return@composed this

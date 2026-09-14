@@ -96,8 +96,8 @@ private fun TileContent(
             scale.animateTo(
                 targetValue = 1.0f,
                 animationSpec = spring(
-                    dampingRatio = 0.6f,
-                    stiffness = 500f
+                    dampingRatio = 0.55f,
+                    stiffness = 600f
                 )
             )
         }

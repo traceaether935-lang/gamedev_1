@@ -29,7 +29,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -152,6 +151,16 @@ fun HomeScreen(
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
+                    }
+                    IconButton(
+                        onClick = onStatisticsClicked,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.BarChart,
+                            contentDescription = "Statistics",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                     }
                     IconButton(
                         onClick = onSettingsClicked,
@@ -282,47 +291,7 @@ fun HomeScreen(
                 )
             }
 
-            // 📈 Statistics
-            OutlinedButton(
-                onClick = onStatisticsClicked,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.BarChart,
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "Statistics",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
 
-            // ⚙️ Settings
-            OutlinedButton(
-                onClick = onSettingsClicked,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Settings,
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "Settings",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
